@@ -1,0 +1,235 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "authorship_tag": "ABX9TyN2eGh2I2EyAUq8LnZSwmei",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/jayeshkothari11/Dashboards_that_dont_lie/blob/main/Step%20by%20Step%20Instructions\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "id": "2YfV03xuzjPy"
+      },
+      "outputs": [],
+      "source": [
+        "# Install necessary packages\n",
+        "\n",
+        "pip install streamlit pandas plotly\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Create a Python file\n",
+        "\n",
+        "touch streamlit_energy_dashboard.py"
+      ],
+      "metadata": {
+        "id": "rvi9W-PWDqYH"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Load the Data\n",
+        "# Use your dataset (energy_EU.csv) in the project folder.\n",
+        "# Convert numeric columns for calculations.\n",
+        "\n",
+        "import streamlit as st\n",
+        "import pandas as pd\n",
+        "\n",
+        "@st.cache_data\n",
+        "def load_data():\n",
+        "    df = pd.read_csv(\"Energy_EU.csv\")\n",
+        "    cols = [col for col in df.columns if col != \"Country\"]\n",
+        "    df[cols] = df[cols].apply(pd.to_numeric, errors=\"coerce\")\n",
+        "    return df\n",
+        "\n",
+        "df = load_data()\n",
+        "st.write(df.head())\n",
+        "\n",
+        "# Task: Verify the data loads correctly and numeric columns are ready for calculations."
+      ],
+      "metadata": {
+        "id": "ygOwyz0QDwki"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Add Sidebar Filters\n",
+        "# Let users select countries to filter charts\n",
+        "\n",
+        "countries = st.sidebar.multiselect(\n",
+        "    \"Select Countries:\",\n",
+        "    options=df['Country'].unique(),\n",
+        "    default=df['Country'].unique()\n",
+        ")\n",
+        "\n",
+        "filtered_df = df[df['Country'].isin(countries)]\n",
+        "\n",
+        "# Task: Test selecting one or more countries and check that filtered_df updates."
+      ],
+      "metadata": {
+        "id": "C_cKhuTED_sS"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Add KPIs\n",
+        "# Calculate total power, renewable, and non-renewable contributions.\n",
+        "# Show percentages on top and numeric values below.\n",
+        "\n",
+        "renewables = ['Hydro-electricity', 'Geo-thermal', 'Tide and wave', 'Solar', 'Wind', 'Biomass and waste']\n",
+        "non_renewables = ['Nuclear', 'Fossil fuels']\n",
+        "\n",
+        "total_power = filtered_df[renewables + non_renewables].sum().sum()\n",
+        "total_renewable = filtered_df[renewables].sum().sum()\n",
+        "total_non_renewable = filtered_df[non_renewables].sum().sum()\n",
+        "\n",
+        "perc_renewable = total_renewable / total_power * 100\n",
+        "perc_non_renewable = total_non_renewable / total_power * 100\n",
+        "\n",
+        "col1, col2, col3 = st.columns(3)\n",
+        "with col1:\n",
+        "    st.markdown(f\"<h2 style='text-align:center;color:green'>{perc_renewable:.1f}%</h2>\", unsafe_allow_html=True)\n",
+        "    st.markdown(f\"<p style='text-align:center;font-size:14px'>{int(total_renewable):,} GWh</p>\", unsafe_allow_html=True)\n",
+        "\n",
+        "with col2:\n",
+        "    st.markdown(f\"<h2 style='text-align:center;color:red'>{perc_non_renewable:.1f}%</h2>\", unsafe_allow_html=True)\n",
+        "    st.markdown(f\"<p style='text-align:center;font-size:14px'>{int(total_non_renewable):,} GWh</p>\", unsafe_allow_html=True)\n",
+        "\n",
+        "with col3:\n",
+        "    st.markdown(f\"<h2 style='text-align:center;color:blue'>100%</h2>\", unsafe_allow_html=True)\n",
+        "    st.markdown(f\"<p style='text-align:center;font-size:14px'>{int(total_power):,} GWh</p>\", unsafe_allow_html=True)"
+      ],
+      "metadata": {
+        "id": "IZvWjLtoEKtq"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Build Charts\n",
+        "# Stacked Bar Chart for Power Generation by Source\n",
+        "\n",
+        "import plotly.express as px\n",
+        "\n",
+        "power_sources = non_renewables + renewables\n",
+        "filtered_df[\"Total_Power\"] = filtered_df[power_sources].sum(axis=1)\n",
+        "country_order = filtered_df.sort_values(\"Total_Power\", ascending=False)[\"Country\"].tolist()\n",
+        "\n",
+        "df_melted = filtered_df.melt(\n",
+        "    id_vars='Country',\n",
+        "    value_vars=power_sources,\n",
+        "    var_name='Source',\n",
+        "    value_name='Generation'\n",
+        ")\n",
+        "source_order = df_melted.groupby(\"Source\")[\"Generation\"].sum().sort_values(ascending=False).index.tolist()\n",
+        "\n",
+        "fig_power = px.bar(\n",
+        "    df_melted,\n",
+        "    x='Country',\n",
+        "    y='Generation',\n",
+        "    color='Source',\n",
+        "    text_auto='.0f',\n",
+        "    category_orders={'Country': country_order, 'Source': source_order}\n",
+        ")\n",
+        "fig_power.update_xaxes(tickangle=45)\n",
+        "st.plotly_chart(fig_power, use_container_width=True)\n"
+      ],
+      "metadata": {
+        "id": "e8MysGjuEatK"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Bar Chart for Total Consumption\n",
+        "\n",
+        "fig_consumption = px.bar(\n",
+        "    filtered_df,\n",
+        "    x='Country',\n",
+        "    y='Consumption',\n",
+        "    text_auto='.0f'\n",
+        ")\n",
+        "fig_consumption.update_xaxes(tickangle=45)\n",
+        "st.plotly_chart(fig_consumption, use_container_width=True)\n"
+      ],
+      "metadata": {
+        "id": "K5E6RPJBEfYm"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Bar Chart for Exports vs Imports\n",
+        "\n",
+        "df_trade = filtered_df.melt(\n",
+        "    id_vars='Country',\n",
+        "    value_vars=['Exports', 'Imports'],\n",
+        "    var_name='Trade Type',\n",
+        "    value_name='Value'\n",
+        ")\n",
+        "fig_trade = px.bar(df_trade, x='Country', y='Value', color='Trade Type', text_auto='.0f')\n",
+        "fig_trade.update_xaxes(tickangle=45)\n",
+        "st.plotly_chart(fig_trade, use_container_width=True)"
+      ],
+      "metadata": {
+        "id": "2pPk9amUEiiC"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Run the Dashboard\n",
+        "\n",
+        "streamlit run streamlit_energy_dashboard.py\n",
+        "\n",
+        "# or  python -m streamlit run dashboard_demo.py  (if stored library is installed somewhere else and  the code/file in different lications)"
+      ],
+      "metadata": {
+        "id": "Y1AN4ntAEmlm"
+      },
+      "execution_count": null,
+      "outputs": []
+    }
+  ]
+}
